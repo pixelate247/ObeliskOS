@@ -687,4 +687,914 @@
                 'Welcome.txt': 'Welcome to WebOS!\n\nThis is a simple web-based operating system with apps like Notepad, Calculator, File Browser, Terminal, and Settings.\n\nDouble-click icons on the desktop or use the Start menu to launch applications.'
             },
             'Pictures': {},
-            '
+            'Downloads': {}
+        };
+        let notes = {
+            'Untitled.txt': ''
+        };
+        let settings = {
+            theme: 'light',
+            wallpaper: 'default',
+            animations: true
+        };
+
+        // Initialize the OS
+        function initOS() {
+            loadData();
+            updateClock();
+            setInterval(updateClock, 1000);
+            
+            // Event listeners
+            document.getElementById('start-button').addEventListener('click', toggleStartMenu);
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#start-menu') && !e.target.closest('#start-button')) {
+                    document.getElementById('start-menu').style.display = 'none';
+                }
+            });
+            
+            // Check for dark mode preference
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                toggleDarkMode(true);
+            }
+            
+            // Load saved theme
+            if (settings.theme === 'dark') {
+                toggleDarkMode(true);
+            }
+        }
+
+        // Toggle start menu
+        function toggleStartMenu() {
+            const startMenu = document.getElementById('start-menu');
+            startMenu.style.display = startMenu.style.display === 'flex' ? 'none' : 'flex';
+        }
+
+        // Open an application
+        function openApp(appName) {
+            // Close start menu
+            document.getElementById('start-menu').style.display = 'none';
+            
+            // Check if app is already open
+            const existingWindow = windows.find(w => w.appName === appName);
+            if (existingWindow) {
+                focusWindow(existingWindow.id);
+                return;
+            }
+            
+            // Create new window
+            const windowId = 'window-' + Date.now();
+            const windowElement = document.createElement('div');
+            windowElement.className = 'window';
+            windowElement.id = windowId;
+            windowElement.style.left = '100px';
+            windowElement.style.top = '100px';
+            
+            // Window header
+            const windowHeader = document.createElement('div');
+            windowHeader.className = 'window-header';
+            
+            const windowIcon = document.createElement('img');
+            windowIcon.src = getAppIcon(appName);
+            windowIcon.width = 16;
+            windowIcon.height = 16;
+            
+            const windowTitle = document.createElement('div');
+            windowTitle.className = 'window-title';
+            windowTitle.textContent = getAppTitle(appName);
+            
+            const windowControls = document.createElement('div');
+            windowControls.className = 'window-controls';
+            
+            const minimizeBtn = document.createElement('button');
+            minimizeBtn.className = 'window-control';
+            minimizeBtn.innerHTML = '&minus;';
+            minimizeBtn.onclick = () => minimizeWindow(windowId);
+            
+            const maximizeBtn = document.createElement('button');
+            maximizeBtn.className = 'window-control';
+            maximizeBtn.innerHTML = '□';
+            maximizeBtn.onclick = () => toggleMaximizeWindow(windowId);
+            
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'window-control';
+            closeBtn.innerHTML = '×';
+            closeBtn.onclick = () => closeWindow(windowId);
+            
+            windowControls.appendChild(minimizeBtn);
+            windowControls.appendChild(maximizeBtn);
+            windowControls.appendChild(closeBtn);
+            
+            windowHeader.appendChild(windowIcon);
+            windowHeader.appendChild(windowTitle);
+            windowHeader.appendChild(windowControls);
+            
+            // Window content
+            const windowContent = document.createElement('div');
+            windowContent.className = 'window-content';
+            
+            // Add app-specific content
+            switch (appName) {
+                case 'notepad':
+                    createNotepadApp(windowContent);
+                    break;
+                case 'calculator':
+                    createCalculatorApp(windowContent);
+                    break;
+                case 'files':
+                    createFileBrowserApp(windowContent);
+                    break;
+                case 'terminal':
+                    createTerminalApp(windowContent);
+                    break;
+                case 'settings':
+                    createSettingsApp(windowContent);
+                    break;
+            }
+            
+            windowElement.appendChild(windowHeader);
+            windowElement.appendChild(windowContent);
+            
+            // Add to DOM
+            document.body.appendChild(windowElement);
+            
+            // Make draggable
+            makeDraggable(windowElement, windowHeader);
+            
+            // Add to windows array
+            const windowObj = {
+                id: windowId,
+                element: windowElement,
+                appName: appName,
+                minimized: false,
+                maximized: false,
+                originalPosition: { left: '100px', top: '100px' },
+                originalSize: { width: 'auto', height: 'auto' }
+            };
+            
+            windows.push(windowObj);
+            
+            // Focus the new window
+            focusWindow(windowId);
+            
+            // Add to taskbar
+            addToTaskbar(windowId, appName);
+        }
+
+        // Create Notepad app
+        function createNotepadApp(container) {
+            const notepadContainer = document.createElement('div');
+            notepadContainer.className = 'notepad';
+            
+            // Toolbar
+            const toolbar = document.createElement('div');
+            toolbar.className = 'notepad-toolbar';
+            
+            const saveBtn = document.createElement('button');
+            saveBtn.textContent = 'Save';
+            saveBtn.onclick = () => saveNote();
+            
+            const newBtn = document.createElement('button');
+            newBtn.textContent = 'New';
+            newBtn.onclick = () => newNote();
+            
+            const openBtn = document.createElement('button');
+            openBtn.textContent = 'Open';
+            openBtn.onclick = () => openNote();
+            
+            toolbar.appendChild(newBtn);
+            toolbar.appendChild(openBtn);
+            toolbar.appendChild(saveBtn);
+            
+            // Content area
+            const content = document.createElement('textarea');
+            content.className = 'notepad-content';
+            content.placeholder = 'Type your text here...';
+            content.value = notes['Untitled.txt'] || '';
+            content.oninput = (e) => {
+                notes['Untitled.txt'] = e.target.value;
+            };
+            
+            notepadContainer.appendChild(toolbar);
+            notepadContainer.appendChild(content);
+            container.appendChild(notepadContainer);
+        }
+
+        // Create Calculator app
+        function createCalculatorApp(container) {
+            const calculator = document.createElement('div');
+            calculator.className = 'calculator';
+            
+            // Display
+            const display = document.createElement('div');
+            display.className = 'calculator-display';
+            display.textContent = '0';
+            
+            // Buttons
+            const buttons = [
+                { text: 'C', class: '', action: 'clear' },
+                { text: '±', class: '', action: 'negate' },
+                { text: '%', class: '', action: 'percent' },
+                { text: '÷', class: 'operator', action: 'divide' },
+                { text: '7', class: '', action: '7' },
+                { text: '8', class: '', action: '8' },
+                { text: '9', class: '', action: '9' },
+                { text: '×', class: 'operator', action: 'multiply' },
+                { text: '4', class: '', action: '4' },
+                { text: '5', class: '', action: '5' },
+                { text: '6', class: '', action: '6' },
+                { text: '-', class: 'operator', action: 'subtract' },
+                { text: '1', class: '', action: '1' },
+                { text: '2', class: '', action: '2' },
+                { text: '3', class: '', action: '3' },
+                { text: '+', class: 'operator', action: 'add' },
+                { text: '0', class: '', action: '0', colspan: 2 },
+                { text: '.', class: '', action: 'decimal' },
+                { text: '=', class: 'equals', action: 'equals' }
+            ];
+            
+            buttons.forEach(btn => {
+                const button = document.createElement('button');
+                button.textContent = btn.text;
+                if (btn.class) button.classList.add(btn.class);
+                if (btn.colspan) button.style.gridColumn = `span ${btn.colspan}`;
+                
+                button.onclick = () => {
+                    handleCalculatorButton(btn.action, display);
+                };
+                
+                calculator.appendChild(button);
+            });
+            
+            container.appendChild(display);
+            container.appendChild(calculator);
+        }
+
+        // Create File Browser app
+        function createFileBrowserApp(container) {
+            const fileBrowser = document.createElement('div');
+            fileBrowser.className = 'file-browser';
+            
+            // Sidebar
+            const sidebar = document.createElement('div');
+            sidebar.className = 'file-browser-sidebar';
+            
+            const sidebarItems = ['Documents', 'Pictures', 'Downloads'];
+            sidebarItems.forEach(item => {
+                const sidebarItem = document.createElement('div');
+                sidebarItem.className = 'file-browser-item';
+                sidebarItem.innerHTML = `<img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEwLDRINEExLDEgMCAwLDAsMyw1VjE5QTEsMSAwIDAsMCw0LDIwSDIwQTEsMSAwIDAsMCwyMSwxOVY4QTEsMSAwIDAsMCwyMCw3SDE0TDEwLDRaIiBmaWxsPSJjdXJyZW50Q29sb3IiLz48L3N2Zz4=" alt="Folder"> ${item}`;
+                sidebarItem.onclick = () => browseFolder(item);
+                sidebar.appendChild(sidebarItem);
+            });
+            
+            // Content area
+            const content = document.createElement('div');
+            content.className = 'file-browser-content';
+            content.id = 'file-browser-content';
+            
+            fileBrowser.appendChild(sidebar);
+            fileBrowser.appendChild(content);
+            container.appendChild(fileBrowser);
+            
+            // Show default folder
+            browseFolder('Documents');
+        }
+
+        // Create Terminal app
+        function createTerminalApp(container) {
+            const terminal = document.createElement('div');
+            terminal.className = 'terminal';
+            
+            // Toolbar
+            const toolbar = document.createElement('div');
+            toolbar.className = 'terminal-toolbar';
+            
+            const clearBtn = document.createElement('button');
+            clearBtn.textContent = 'Clear';
+            clearBtn.onclick = () => {
+                const content = terminal.querySelector('.terminal-content');
+                content.innerHTML = '';
+                addTerminalPrompt(content);
+            };
+            
+            toolbar.appendChild(clearBtn);
+            
+            // Content area
+            const content = document.createElement('div');
+            content.className = 'terminal-content';
+            
+            // Input area
+            const inputArea = document.createElement('div');
+            inputArea.className = 'terminal-input';
+            
+            const prompt = document.createElement('span');
+            prompt.className = 'terminal-prompt';
+            prompt.textContent = 'user@webos:~$ ';
+            
+            const commandInput = document.createElement('input');
+            commandInput.className = 'terminal-command';
+            commandInput.type = 'text';
+            commandInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    executeCommand(commandInput.value, content);
+                    commandInput.value = '';
+                }
+            });
+            
+            inputArea.appendChild(prompt);
+            inputArea.appendChild(commandInput);
+            
+            terminal.appendChild(toolbar);
+            terminal.appendChild(content);
+            terminal.appendChild(inputArea);
+            container.appendChild(terminal);
+            
+            // Add initial prompt
+            addTerminalPrompt(content);
+        }
+
+        // Create Settings app
+        function createSettingsApp(container) {
+            const settingsContainer = document.createElement('div');
+            settingsContainer.className = 'settings';
+            
+            // Content area
+            const content = document.createElement('div');
+            content.className = 'settings-content';
+            
+            // Theme settings
+            const themeGroup = document.createElement('div');
+            themeGroup.className = 'settings-group';
+            
+            const themeTitle = document.createElement('div');
+            themeTitle.className = 'settings-group-title';
+            themeTitle.textContent = 'Appearance';
+            
+            const themeOption = document.createElement('div');
+            themeOption.className = 'settings-option';
+            
+            const themeToggle = document.createElement('input');
+            themeToggle.type = 'checkbox';
+            themeToggle.id = 'dark-mode-toggle';
+            themeToggle.checked = settings.theme === 'dark';
+            themeToggle.onchange = (e) => {
+                toggleDarkMode(e.target.checked);
+                settings.theme = e.target.checked ? 'dark' : 'light';
+                saveData();
+            };
+            
+            const themeLabel = document.createElement('label');
+            themeLabel.htmlFor = 'dark-mode-toggle';
+            themeLabel.textContent = 'Dark Mode';
+            
+            themeOption.appendChild(themeToggle);
+            themeOption.appendChild(themeLabel);
+            
+            themeGroup.appendChild(themeTitle);
+            themeGroup.appendChild(themeOption);
+            
+            // Data management
+            const dataGroup = document.createElement('div');
+            dataGroup.className = 'settings-group';
+            
+            const dataTitle = document.createElement('div');
+            dataTitle.className = 'settings-group-title';
+            dataTitle.textContent = 'Data Management';
+            
+            const exportBtn = document.createElement('button');
+            exportBtn.textContent = 'Export Data';
+            exportBtn.onclick = showExportModal;
+            
+            const importBtn = document.createElement('button');
+            importBtn.textContent = 'Import Data';
+            importBtn.onclick = showImportModal;
+            
+            dataGroup.appendChild(dataTitle);
+            dataGroup.appendChild(exportBtn);
+            dataGroup.appendChild(importBtn);
+            
+            content.appendChild(themeGroup);
+            content.appendChild(dataGroup);
+            settingsContainer.appendChild(content);
+            container.appendChild(settingsContainer);
+        }
+
+        // Window management
+        function focusWindow(windowId) {
+            const windowObj = windows.find(w => w.id === windowId);
+            if (!windowObj) return;
+            
+            // Bring to front
+            zIndex++;
+            windowObj.element.style.zIndex = zIndex;
+            
+            // Update active state
+            if (activeWindow) {
+                activeWindow.element.classList.remove('active');
+                const taskbarBtn = document.querySelector(`.taskbar-app[data-window="${activeWindow.id}"]`);
+                if (taskbarBtn) taskbarBtn.classList.remove('active');
+            }
+            
+            windowObj.element.classList.add('active');
+            activeWindow = windowObj;
+            
+            // Update taskbar
+            const taskbarBtn = document.querySelector(`.taskbar-app[data-window="${windowId}"]`);
+            if (taskbarBtn) taskbarBtn.classList.add('active');
+            
+            // Restore if minimized
+            if (windowObj.minimized) {
+                windowObj.element.style.display = 'flex';
+                windowObj.minimized = false;
+            }
+        }
+
+        function minimizeWindow(windowId) {
+            const windowObj = windows.find(w => w.id === windowId);
+            if (!windowObj) return;
+            
+            windowObj.element.style.display = 'none';
+            windowObj.minimized = true;
+            
+            // Update taskbar
+            const taskbarBtn = document.querySelector(`.taskbar-app[data-window="${windowId}"]`);
+            if (taskbarBtn) taskbarBtn.classList.remove('active');
+        }
+
+        function toggleMaximizeWindow(windowId) {
+            const windowObj = windows.find(w => w.id === windowId);
+            if (!windowObj) return;
+            
+            if (windowObj.maximized) {
+                // Restore
+                windowObj.element.style.width = windowObj.originalSize.width;
+                windowObj.element.style.height = windowObj.originalSize.height;
+                windowObj.element.style.left = windowObj.originalPosition.left;
+                windowObj.element.style.top = windowObj.originalPosition.top;
+                windowObj.maximized = false;
+            } else {
+                // Maximize
+                windowObj.originalSize = {
+                    width: windowObj.element.style.width,
+                    height: windowObj.element.style.height
+                };
+                windowObj.originalPosition = {
+                    left: windowObj.element.style.left,
+                    top: windowObj.element.style.top
+                };
+                
+                windowObj.element.style.width = 'calc(100% - 40px)';
+                windowObj.element.style.height = 'calc(100% - 80px)';
+                windowObj.element.style.left = '20px';
+                windowObj.element.style.top = '20px';
+                windowObj.maximized = true;
+            }
+        }
+
+        function closeWindow(windowId) {
+            const windowObj = windows.find(w => w.id === windowId);
+            if (!windowObj) return;
+            
+            // Remove from DOM
+            windowObj.element.remove();
+            
+            // Remove from windows array
+            windows = windows.filter(w => w.id !== windowId);
+            
+            // Remove from taskbar
+            const taskbarBtn = document.querySelector(`.taskbar-app[data-window="${windowId}"]`);
+            if (taskbarBtn) taskbarBtn.remove();
+            
+            // Focus next window if available
+            if (windows.length > 0) {
+                focusWindow(windows[windows.length - 1].id);
+            } else {
+                activeWindow = null;
+            }
+        }
+
+        function addToTaskbar(windowId, appName) {
+            const taskbarApps = document.getElementById('taskbar-apps');
+            
+            const taskbarApp = document.createElement('button');
+            taskbarApp.className = 'taskbar-app';
+            taskbarApp.dataset.window = windowId;
+            taskbarApp.innerHTML = `<img src="${getAppIcon(appName)}" width="16" height="16"> ${getAppTitle(appName)}`;
+            taskbarApp.onclick = () => {
+                const windowObj = windows.find(w => w.id === windowId);
+                if (windowObj.minimized) {
+                    windowObj.element.style.display = 'flex';
+                    windowObj.minimized = false;
+                    focusWindow(windowId);
+                } else if (activeWindow && activeWindow.id === windowId) {
+                    minimizeWindow(windowId);
+                } else {
+                    focusWindow(windowId);
+                }
+            };
+            
+            taskbarApps.appendChild(taskbarApp);
+        }
+
+        function makeDraggable(element, handle) {
+            let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+            
+            handle.onmousedown = dragMouseDown;
+            
+            function dragMouseDown(e) {
+                e = e || window.event;
+                e.preventDefault();
+                
+                // Get the mouse cursor position at startup
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                
+                document.onmouseup = closeDragElement;
+                document.onmousemove = elementDrag;
+                
+                // Focus the window
+                const windowId = element.id;
+                focusWindow(windowId);
+            }
+            
+            function elementDrag(e) {
+                e = e || window.event;
+                e.preventDefault();
+                
+                // Calculate the new cursor position
+                pos1 = pos3 - e.clientX;
+                pos2 = pos4 - e.clientY;
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                
+                // Set the element's new position
+                element.style.top = (element.offsetTop - pos2) + "px";
+                element.style.left = (element.offsetLeft - pos1) + "px";
+            }
+            
+            function closeDragElement() {
+                // Stop moving when mouse button is released
+                document.onmouseup = null;
+                document.onmousemove = null;
+            }
+        }
+
+        // Calculator functions
+        function handleCalculatorButton(action, display) {
+            let current = display.textContent;
+            
+            switch (action) {
+                case 'clear':
+                    display.textContent = '0';
+                    break;
+                case 'negate':
+                    if (current !== '0') {
+                        display.textContent = current.startsWith('-') ? current.slice(1) : '-' + current;
+                    }
+                    break;
+                case 'percent':
+                    display.textContent = (parseFloat(current) / 100).toString();
+                    break;
+                case 'divide':
+                case 'multiply':
+                case 'subtract':
+                case 'add':
+                    if (!current.endsWith(' ')) {
+                        display.textContent += ` ${action === 'divide' ? '÷' : action === 'multiply' ? '×' : action === 'add' ? '+' : '-'} `;
+                    }
+                    break;
+                case 'equals':
+                    try {
+                        const expression = current.replace(/×/g, '*').replace(/÷/g, '/');
+                        display.textContent = eval(expression).toString();
+                    } catch {
+                        display.textContent = 'Error';
+                    }
+                    break;
+                case 'decimal':
+                    if (!current.includes('.')) {
+                        display.textContent += '.';
+                    }
+                    break;
+                default: // Numbers
+                    if (current === '0' || current === 'Error') {
+                        display.textContent = action;
+                    } else {
+                        display.textContent += action;
+                    }
+            }
+        }
+
+        // File Browser functions
+        function browseFolder(folderName) {
+            const content = document.getElementById('file-browser-content');
+            content.innerHTML = '';
+            
+            const folder = files[folderName];
+            if (!folder) return;
+            
+            // Add back button if not root
+            if (folderName !== 'Documents') {
+                const backItem = document.createElement('div');
+                backItem.className = 'file-browser-item';
+                backItem.innerHTML = '<img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTIwLDExVjEzSDhMMTMsMThMMTIsMTlMMTAsMTdMMTAsMTlMMTIsMjFMMTMsMjBMMTgsMTVMMjAsMTNaTTQsM0gxNkMxNi44OCwzIDE3LjU1LDMuNzIgMTcuNTUsNC41NkwxOC41LDguNUgyOEMxOC44OSw4LjUgMTkuNTUsOS4xMiAxOS41NSwxMC4wMUwxOS41LDE3LjVDMTkuNSwxOC4zMyAxOC44OCwxOSAxOCwxOUg0QzMuMTIsMTkgMi41LDE4LjMzIDIuNSwxNy41VjQuNUMzLjUsMy42NyA0LjEyLDMgNCwzTTQuNCw1VjE3SDguNVYxMkw0LjQsNV0iIGZpbGw9ImN1cnJlbnRDb2xvciIvPjwvc3ZnPg==" alt="Back"> ..';
+                backItem.onclick = () => browseFolder('Documents');
+                content.appendChild(backItem);
+            }
+            
+            // Add files
+            Object.keys(folder).forEach(fileName => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-browser-item';
+                
+                const icon = document.createElement('img');
+                icon.src = fileName.endsWith('.txt') ? 
+                    'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTE0LDJINkEyLDIgMCAwLDAsNCw0VjIwQTIsMiAwIDAsMCw2LDIySDE4QTIsMiAwIDAsMCwyMCwyMFY4TDE0LDJNNiw0SDEzVjlIMThWMjBINlY0TTgsMTJWMTRIMTYVMTJIOE04LDE1VjE3SDE2VjE1SDhaIiBmaWxsPSJjdXJyZW50Q29sb3IiLz48L3N2Zz4=' : 
+                    'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTgsNUgxNlYxOUg4VjVNMTgsNUgyMFYxOUgxOFY1TTQsNUg2VjE5SDRWNU0xMCw1SDEyVjE5SDEwVjVaIiBmaWxsPSJjdXJyZW50Q29sb3IiLz48L3N2Zz4=';
+                
+                fileItem.appendChild(icon);
+                fileItem.appendChild(document.createTextNode(fileName));
+                
+                fileItem.onclick = () => {
+                    if (fileName.endsWith('.txt')) {
+                        openFileInNotepad(folderName, fileName);
+                    }
+                };
+                
+                content.appendChild(fileItem);
+            });
+        }
+
+        // Terminal functions
+        function addTerminalPrompt(content) {
+            const prompt = document.createElement('div');
+            prompt.className = 'terminal-line';
+            prompt.innerHTML = '<span class="terminal-prompt">user@webos:~$ </span><span class="terminal-command"></span>';
+            content.appendChild(prompt);
+        }
+
+        function executeCommand(command, content) {
+            if (!command.trim()) return;
+            
+            // Add command to output
+            const commandLine = document.createElement('div');
+            commandLine.className = 'terminal-line';
+            commandLine.innerHTML = `<span class="terminal-prompt">user@webos:~$ </span><span class="terminal-command">${command}</span>`;
+            content.appendChild(commandLine);
+            
+            // Process command
+            const output = document.createElement('div');
+            output.className = 'terminal-output';
+            
+            const args = command.split(' ');
+            const cmd = args[0].toLowerCase();
+            
+            switch (cmd) {
+                case 'help':
+                    output.innerHTML = `
+                        Available commands:<br>
+                        - help: Show this help message<br>
+                        - clear: Clear the terminal<br>
+                        - echo [text]: Print text to the terminal<br>
+                        - ls: List files<br>
+                        - cat [file]: View file contents<br>
+                        - theme [light|dark]: Change theme<br>
+                        - date: Show current date and time<br>
+                    `;
+                    break;
+                case 'clear':
+                    content.innerHTML = '';
+                    return; // Don't add new prompt if clearing
+                case 'echo':
+                    output.textContent = args.slice(1).join(' ');
+                    break;
+                case 'ls':
+                    output.textContent = Object.keys(files['Documents']).join('\n') || 'No files in Documents';
+                    break;
+                case 'cat':
+                    if (args.length < 2) {
+                        output.textContent = 'Usage: cat [filename]';
+                    } else {
+                        const filename = args[1];
+                        if (files['Documents'][filename]) {
+                            output.textContent = files['Documents'][filename];
+                        } else {
+                            output.textContent = `File not found: ${filename}`;
+                        }
+                    }
+                    break;
+                case 'theme':
+                    if (args.length < 2) {
+                        output.textContent = 'Current theme: ' + (darkMode ? 'dark' : 'light');
+                    } else {
+                        const theme = args[1].toLowerCase();
+                        if (theme === 'light' || theme === 'dark') {
+                            toggleDarkMode(theme === 'dark');
+                            output.textContent = `Theme set to ${theme}`;
+                        } else {
+                            output.textContent = 'Invalid theme. Use "light" or "dark"';
+                        }
+                    }
+                    break;
+                case 'date':
+                    output.textContent = new Date().toString();
+                    break;
+                default:
+                    output.textContent = `Command not found: ${cmd}`;
+            }
+            
+            content.appendChild(output);
+            addTerminalPrompt(content);
+            
+            // Scroll to bottom
+            content.scrollTop = content.scrollHeight;
+        }
+
+        // Notepad functions
+        function newNote() {
+            notes['Untitled.txt'] = '';
+            const notepadWindow = windows.find(w => w.appName === 'notepad');
+            if (notepadWindow) {
+                const textarea = notepadWindow.element.querySelector('.notepad-content');
+                if (textarea) textarea.value = '';
+            }
+        }
+
+        function saveNote() {
+            // In a real app, this would prompt for a filename
+            // For simplicity, we'll just save to "Untitled.txt"
+            const notepadWindow = windows.find(w => w.appName === 'notepad');
+            if (notepadWindow) {
+                const textarea = notepadWindow.element.querySelector('.notepad-content');
+                if (textarea) {
+                    notes['Untitled.txt'] = textarea.value;
+                    saveData();
+                }
+            }
+        }
+
+        function openNote() {
+            // In a real app, this would show a file dialog
+            // For simplicity, we'll just open the first note
+            const filename = Object.keys(notes)[0];
+            if (filename) {
+                const notepadWindow = windows.find(w => w.appName === 'notepad');
+                if (notepadWindow) {
+                    const textarea = notepadWindow.element.querySelector('.notepad-content');
+                    if (textarea) textarea.value = notes[filename];
+                }
+            }
+        }
+
+        function openFileInNotepad(folder, filename) {
+            const content = files[folder][filename];
+            notes[filename] = content;
+            
+            // Open or focus notepad
+            const notepadWindow = windows.find(w => w.appName === 'notepad');
+            if (notepadWindow) {
+                const textarea = notepadWindow.element.querySelector('.notepad-content');
+                if (textarea) textarea.value = content;
+                focusWindow(notepadWindow.id);
+            } else {
+                openApp('notepad');
+                // Need to wait for the notepad to open
+                setTimeout(() => {
+                    const notepadWindow = windows.find(w => w.appName === 'notepad');
+                    if (notepadWindow) {
+                        const textarea = notepadWindow.element.querySelector('.notepad-content');
+                        if (textarea) textarea.value = content;
+                    }
+                }, 100);
+            }
+        }
+
+        // Theme functions
+        function toggleDarkMode(enable) {
+            darkMode = enable;
+            if (enable) {
+                document.body.classList.add('dark-mode');
+            } else {
+                document.body.classList.remove('dark-mode');
+            }
+            settings.theme = enable ? 'dark' : 'light';
+            saveData();
+        }
+
+        // Data management
+        function saveData() {
+            const data = {
+                files: files,
+                notes: notes,
+                settings: settings
+            };
+            localStorage.setItem('webos-data', JSON.stringify(data));
+        }
+
+        function loadData() {
+            const savedData = localStorage.getItem('webos-data');
+            if (savedData) {
+                try {
+                    const data = JSON.parse(savedData);
+                    files = data.files || files;
+                    notes = data.notes || notes;
+                    settings = data.settings || settings;
+                    
+                    // Apply saved theme
+                    if (settings.theme === 'dark') {
+                        toggleDarkMode(true);
+                    }
+                } catch (e) {
+                    console.error('Failed to load saved data:', e);
+                }
+            }
+        }
+
+        function exportData() {
+            const data = {
+                files: files,
+                notes: notes,
+                settings: settings
+            };
+            return btoa(JSON.stringify(data));
+        }
+
+        function importData(importString) {
+            try {
+                const data = JSON.parse(atob(importString));
+                files = data.files || files;
+                notes = data.notes || notes;
+                settings = data.settings || settings;
+                
+                // Apply imported theme
+                if (settings.theme === 'dark') {
+                    toggleDarkMode(true);
+                } else {
+                    toggleDarkMode(false);
+                }
+                
+                saveData();
+                return true;
+            } catch (e) {
+                console.error('Failed to import data:', e);
+                return false;
+            }
+        }
+
+        // Modal functions
+        function showExportModal() {
+            const modal = document.getElementById('export-modal');
+            const exportCode = document.getElementById('export-code');
+            exportCode.value = exportData();
+            modal.style.display = 'flex';
+        }
+
+        function showImportModal() {
+            const modal = document.getElementById('import-modal');
+            const importCode = document.getElementById('import-code');
+            importCode.value = '';
+            modal.style.display = 'flex';
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+
+        function copyExportCode() {
+            const exportCode = document.getElementById('export-code');
+            exportCode.select();
+            document.execCommand('copy');
+        }
+
+        function importData() {
+            const importCode = document.getElementById('import-code');
+            if (importData(importCode.value)) {
+                alert('Data imported successfully!');
+                closeModal('import-modal');
+            } else {
+                alert('Failed to import data. Please check the import code.');
+            }
+        }
+
+        // Shutdown functions
+        function shutdown() {
+            document.getElementById('shutdown-modal').style.display = 'flex';
+        }
+
+        function confirmShutdown() {
+            // In a real app, this would properly close the OS
+            alert('WebOS has been shut down. Refresh the page to restart.');
+            closeModal('shutdown-modal');
+        }
+
+        // Utility functions
+        function getAppIcon(appName) {
+            switch (appName) {
+                case 'notepad':
+                    return 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTE5LDMuNUg1QzMuODksMy41IDMsNC4zOSAzLDUuNVYxOS41QzMsMjAuNjEgMy44OSwyMS41IDUsMjEuNUgxOUMyMC4xMSwyMS41IDIxLDIwLjYxIDIxLDE5LjVWNS41QzIxLDQuMzkgMjAuMTEsMy41IDE5LDMuNU0xOSwxOS41SDVWNS41SDE5VjE5LjVNMTcsMTcuNUg3VjE1LjVIMTdWMTcuNU0xNywxMy41SDdWMTEuNUgxN1YxMy41TTE3LDkuNUg3VjcuNUgxN1Y5LjVaIiBmaWxsPSJjdXJyZW50Q29sb3IiLz48L3N2Zz4=';
+                case 'calculator':
+                    return 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTcsMkgxN0EyLDIgMCAwLDEgMTksNFYyMEEyLDIgMCAwLDEgMTcsMjJIN0EyLDIgMCAwLDEgNSwyMFY0QTIsMiAwIDAsMSA3LDJNNyw0VjIwSDE3VjRIN004LDhWMTBIMTBWOEg4TTgsMTJWMTRIMTBWMTJIOE04LDE2VjE4SDEwVjE2SDhNMTQsOEgxMlYxMEgxNFY4TTEyLDEyVjE0SDE0VjEySDEyTTEyLDE2VjE4SDE0VjE2SDEyWiIgZmlsbD0iY3VycmVudENvbG9yIi8+PC9zdmc+';
+                case 'files':
+                    return 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTUsM0M1LDEuODkgNS45LDEgNywxSDEzTDE5LDdWMTdDMTksMTguMSAxOC4xLDE5IDE3LDE5SDdDNS45LDE5IDUsMTguMSA1LDE3VjNNMTMsM1Y3SDE5TDEzLDNaIiBmaWxsPSJjdXJyZW50Q29sb3IiLz48L3N2Zz4=';
+                case 'terminal':
+                    return 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTQsM0gxNkMxNi44OCwzIDE3LjU1LDMuNzIgMTcuNTUsNC41NkwxOC41LDguNUgyOEMxOC44OSw4LjUgMTkuNTUsOS4xMi
